@@ -3,8 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import '../database/database_helper.dart';
 import '../services/weather_service.dart';
+import '../services/nutrition_service.dart';
 import 'profile_screen.dart';
 import 'camera_screen.dart';
+import 'history_screen.dart';
+import 'exercise_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int userId;
@@ -15,6 +18,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  int _currentIndex = 0;
   Map<String, dynamic>? userData;
   double todayCalories = 0;
   double targetCalories = 2000;
@@ -22,9 +26,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   WeatherModel? weather;
   bool isLoading = true;
 
+  late List<Widget> _screens;
+
   @override
   void initState() {
     super.initState();
+    _screens = [
+      _buildHomeScreen(),
+      ExerciseScreen(
+        userId: widget.userId,
+        userWeight: userData?['weight'],
+      ),
+      HistoryScreen(userId: widget.userId),
+      ProfileScreen(userId: widget.userId),
+    ];
     _loadDashboardData();
   }
 
@@ -34,22 +49,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       DatabaseHelper db = DatabaseHelper();
       
-      // Load user data
       userData = await db.getUserById(widget.userId);
-      
-      // Load today's calories
       todayCalories = await db.getTodayCalories(widget.userId);
       
-      // Load target calories
       if (userData != null) {
         targetCalories = userData!['targetCalories'] ?? 2000.0;
       }
       
-      // Load recent foods
       List<Map<String, dynamic>> allFoods = await db.getFoodHistory(widget.userId);
       recentFoods = allFoods.take(5).toList();
 
-      // Load weather data
       WeatherService weatherService = WeatherService();
       Map<String, dynamic>? weatherData = await weatherService.getCurrentWeather('Jakarta');
       if (weatherData != null) {
@@ -67,38 +76,137 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: RefreshIndicator(
-                onRefresh: _loadDashboardData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 24),
-                        _buildWeatherCard(),
-                        const SizedBox(height: 24),
-                        _buildCalorieProgress(),
-                        const SizedBox(height: 24),
-                        _buildScanButton(),
-                        const SizedBox(height: 24),
-                        _buildRecentFoods(),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+      body: _currentIndex == 0
+          ? (isLoading ? const Center(child: CircularProgressIndicator()) : _buildHomeScreen())
+          : _screens[_currentIndex],
+      bottomNavigationBar: _buildBottomNavBar(),
+      floatingActionButton: _currentIndex == 0 ? _buildScanButton() : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        color: Colors.white,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home_rounded, 'Home', 0),
+              _buildNavItem(Icons.fitness_center_rounded, 'Exercise', 1),
+              const SizedBox(width: 60), // Space for FAB
+              _buildNavItem(Icons.history_rounded, 'History', 2),
+              _buildNavItem(Icons.person_rounded, 'Profile', 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    bool isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? const Color(0xFF6EE7B7) : Colors.grey,
+            size: 28,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isSelected ? const Color(0xFF6EE7B7) : Colors.grey,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanButton() {
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6EE7B7), Color(0xFF9AFFC2)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6EE7B7).withOpacity(0.5),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CameraScreen(userId: widget.userId),
+            ),
+          ).then((_) => _loadDashboardData());
+        },
+      ),
+    );
+  }
+
+  Widget _buildHomeScreen() {
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _loadDashboardData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildQuickStats(),
+                const SizedBox(height: 24),
+                _buildWeatherCard(),
+                const SizedBox(height: 24),
+                _buildCalorieProgress(),
+                const SizedBox(height: 24),
+                _buildRecentFoods(),
+                const SizedBox(height: 80), // Space for FAB
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildHeader() {
     String username = userData?['username'] ?? 'User';
+    String greeting = _getGreeting();
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -106,43 +214,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hello, $username 👋',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1F2937),
+              '$greeting,',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: Colors.grey[600],
               ),
             ),
             Text(
-              'Ayo capai target hari ini!',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: Colors.grey[600],
+              username,
+              style: GoogleFonts.poppins(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1F2937),
               ),
             ),
           ],
         ),
         GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProfileScreen(userId: widget.userId),
-              ),
-            ).then((_) => _loadDashboardData());
+            setState(() => _currentIndex = 3);
           },
-          child: CircleAvatar(
-            radius: 28,
-            backgroundColor: const Color(0xFF6EE7B7),
-            backgroundImage: userData?['profileImage'] != null
-                ? FileImage(userData!['profileImage'])
-                : null,
-            child: userData?['profileImage'] == null
-                ? const Icon(Icons.person, color: Colors.white, size: 32)
-                : null,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6EE7B7), Color(0xFF9AFFC2)],
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 28,
+              backgroundColor: Colors.white,
+              child: Text(
+                username[0].toUpperCase(),
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF6EE7B7),
+                ),
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  String _getGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  Widget _buildQuickStats() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            '${recentFoods.length}',
+            'Foods Today',
+            Icons.restaurant_rounded,
+            const Color(0xFF60A5FA),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            '${(targetCalories - todayCalories).toInt()}',
+            'Remaining',
+            Icons.local_fire_department_rounded,
+            const Color(0xFFFBBF24),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String value, String label, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -219,12 +403,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              recommendation,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.white,
-              ),
+            child: Row(
+              children: [
+                const Icon(Icons.lightbulb_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    recommendation,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -252,7 +444,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         children: [
           Text(
-            'Kalori Hari Ini',
+            'Today\'s Calories',
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -260,8 +452,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 20),
           CircularPercentIndicator(
-            radius: 80,
-            lineWidth: 15,
+            radius: 90,
+            lineWidth: 18,
             percent: percentage,
             center: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -269,7 +461,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   '${todayCalories.toInt()}',
                   style: GoogleFonts.poppins(
-                    fontSize: 28,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF6EE7B7),
                   ),
@@ -286,71 +478,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
             progressColor: const Color(0xFF6EE7B7),
             backgroundColor: const Color(0xFFE2E8F0),
             circularStrokeCap: CircularStrokeCap.round,
+            animation: true,
+            animationDuration: 1000,
           ),
           const SizedBox(height: 16),
-          Text(
-            'Target: ${targetCalories.toInt()} kcal',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Target: ${targetCalories.toInt()} kcal',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${(percentage * 100).toInt()}%',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF6EE7B7),
+                ),
+              ),
+            ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildScanButton() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CameraScreen(userId: widget.userId),
-          ),
-        ).then((_) => _loadDashboardData());
-      },
-      child: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF6EE7B7), Color(0xFF9AFFC2)],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF6EE7B7).withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.camera_alt,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              'Scan Makanan',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -363,20 +516,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Makanan Terbaru',
+              'Recent Foods',
               style: GoogleFonts.poppins(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             TextButton(
-              onPressed: () {
-                // Navigate to history page
-              },
+              onPressed: () => setState(() => _currentIndex = 2),
               child: Text(
-                'Lihat Semua',
+                'See All',
                 style: GoogleFonts.inter(
                   color: const Color(0xFF6EE7B7),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -396,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Belum ada makanan terscan',
+                        'No food scanned yet',
                         style: GoogleFonts.inter(
                           color: Colors.grey[500],
                         ),
@@ -439,12 +591,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6EE7B7), Color(0xFF9AFFC2)],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.restaurant,
-              color: Color(0xFF6EE7B7),
+              color: Colors.white,
               size: 32,
             ),
           ),
@@ -470,9 +624,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right,
-            color: Colors.grey,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6EE7B7).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${food['protein']?.toInt() ?? 0}g P',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF6EE7B7),
+              ),
+            ),
           ),
         ],
       ),

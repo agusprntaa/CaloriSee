@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../database/database_helper.dart';
 
@@ -21,6 +22,39 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _takePicture() async {
     try {
+      // Check and request camera permission at runtime
+      PermissionStatus camStatus = await Permission.camera.status;
+      if (!camStatus.isGranted) {
+        camStatus = await Permission.camera.request();
+        if (!camStatus.isGranted) {
+          if (!mounted) return;
+          // Show dialog to explain why permission is needed and offer to open settings
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Izin Kamera Diperlukan'),
+              content: const Text('Aplikasi membutuhkan izin kamera untuk mengambil foto makanan.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Batal'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await openAppSettings();
+                  },
+                  child: const Text('Buka Pengaturan'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.camera,

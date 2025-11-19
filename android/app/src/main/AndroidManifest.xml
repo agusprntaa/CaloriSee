@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Permissions required for taking pictures via ImagePicker -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- For devices before Android 13, allow reading external storage if needed -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- For Android 13+ (API 33) images/media access -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <application
         android:label="calorisee"
         android:name="${applicationName}"

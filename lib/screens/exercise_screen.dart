@@ -7,10 +7,10 @@ class ExerciseScreen extends StatefulWidget {
   final double? userWeight;
   
   const ExerciseScreen({
-    Key? key,
+    super.key,
     required this.userId,
     this.userWeight,
-  }) : super(key: key);
+  });
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();

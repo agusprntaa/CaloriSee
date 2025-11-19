@@ -8,7 +8,7 @@ import '../models/food_model.dart';
 class HistoryScreen extends StatefulWidget {
   final int userId;
   
-  const HistoryScreen({Key? key, required this.userId}) : super(key: key);
+  const HistoryScreen({super.key, required this.userId});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();

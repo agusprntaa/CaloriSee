@@ -11,7 +11,7 @@ import 'exercise_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int userId;
-  const DashboardScreen({Key? key, required this.userId}) : super(key: key);
+  const DashboardScreen({super.key, required this.userId});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -236,9 +236,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
           child: Container(
             padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFF6EE7B7), Color(0xFF9AFFC2)],
               ),
             ),

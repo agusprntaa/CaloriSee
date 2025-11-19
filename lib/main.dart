@@ -26,7 +26,7 @@ void main() async {
 }
 
 class CaloriSeeApp extends StatelessWidget {
-  const CaloriSeeApp({Key? key}) : super(key: key);
+  const CaloriSeeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +87,7 @@ class CaloriSeeApp extends StatelessWidget {
 }
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();

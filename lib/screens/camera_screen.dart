@@ -9,7 +9,7 @@ import '../database/database_helper.dart';
 
 class CameraScreen extends StatefulWidget {
   final int userId;
-  const CameraScreen({Key? key, required this.userId}) : super(key: key);
+  const CameraScreen({super.key, required this.userId});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();

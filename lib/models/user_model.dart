@@ -7,6 +7,9 @@ class UserModel {
   final double? weight;
   final double? height;
   final double targetCalories;
+  final double targetProtein;
+  final double targetFat;
+  final double targetCarbs;
   final String? profileImage;
   final String? createdAt;
 
@@ -19,6 +22,9 @@ class UserModel {
     this.weight,
     this.height,
     this.targetCalories = 2000.0,
+    this.targetProtein = 100.0,
+    this.targetFat = 70.0,
+    this.targetCarbs = 250.0,
     this.profileImage,
     this.createdAt,
   });
@@ -34,6 +40,9 @@ class UserModel {
       'weight': weight,
       'height': height,
       'targetCalories': targetCalories,
+      'targetProtein': targetProtein,
+      'targetFat': targetFat,
+      'targetCarbs': targetCarbs,
       'profileImage': profileImage,
       'createdAt': createdAt ?? DateTime.now().toIso8601String(),
     };
@@ -50,6 +59,9 @@ class UserModel {
       weight: map['weight']?.toDouble(),
       height: map['height']?.toDouble(),
       targetCalories: map['targetCalories']?.toDouble() ?? 2000.0,
+      targetProtein: map['targetProtein']?.toDouble() ?? 100.0,
+      targetFat: map['targetFat']?.toDouble() ?? 70.0,
+      targetCarbs: map['targetCarbs']?.toDouble() ?? 250.0,
       profileImage: map['profileImage'],
       createdAt: map['createdAt'],
     );
@@ -92,6 +104,9 @@ class UserModel {
     double? weight,
     double? height,
     double? targetCalories,
+    double? targetProtein,
+    double? targetFat,
+    double? targetCarbs,
     String? profileImage,
     String? createdAt,
   }) {
@@ -104,6 +119,9 @@ class UserModel {
       weight: weight ?? this.weight,
       height: height ?? this.height,
       targetCalories: targetCalories ?? this.targetCalories,
+      targetProtein: targetProtein ?? this.targetProtein,
+      targetFat: targetFat ?? this.targetFat,
+      targetCarbs: targetCarbs ?? this.targetCarbs,
       profileImage: profileImage ?? this.profileImage,
       createdAt: createdAt ?? this.createdAt,
     );

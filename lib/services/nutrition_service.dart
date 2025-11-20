@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class NutritionService {
   // Edamam Nutrition Analysis API (Free tier: 100 requests/month)
@@ -29,11 +30,11 @@ class NutritionService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        print('Error: ${response.statusCode}');
+        debugPrint('Error: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching nutrition: $e');
+      debugPrint('Error fetching nutrition: $e');
       return null;
     }
   }
@@ -53,11 +54,11 @@ class NutritionService {
         Map<String, dynamic> data = json.decode(response.body);
         return List<Map<String, dynamic>>.from(data['items'] ?? []);
       } else {
-        print('Error: ${response.statusCode}');
+        debugPrint('Error: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching nutrition: $e');
+      debugPrint('Error fetching nutrition: $e');
       return null;
     }
   }
@@ -77,7 +78,7 @@ class NutritionService {
         'sodium': (nutrients['NA']?['quantity'] ?? 0).toDouble(),
       };
     } catch (e) {
-      print('Error parsing nutrition: $e');
+      debugPrint('Error parsing nutrition: $e');
       return {};
     }
   }

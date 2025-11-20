@@ -1,3 +1,4 @@
+
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../database/database_helper.dart';
+ 
 
 class CameraScreen extends StatefulWidget {
   final int userId;
@@ -19,6 +21,7 @@ class _CameraScreenState extends State<CameraScreen> {
   File? _imageFile;
   bool _isAnalyzing = false;
   Map<String, dynamic>? _nutritionData;
+  bool _isSavedAsFavorite = false;
 
   Future<void> _takePicture() async {
     try {
@@ -71,19 +74,19 @@ class _CameraScreenState extends State<CameraScreen> {
         // Simulate AI analysis (2 seconds delay)
         await Future.delayed(const Duration(seconds: 2));
 
-        // Generate mock nutrition data
-        _generateMockNutrition();
+        // Generate mock nutrition data and check favorite status
+        await _generateMockNutrition();
 
         setState(() {
           _isAnalyzing = false;
         });
       }
     } catch (e) {
-      print('Error taking picture: $e');
+      debugPrint('Error taking picture: $e');
     }
   }
 
-  void _generateMockNutrition() {
+  Future<void> _generateMockNutrition() async {
     // List of sample foods
     List<Map<String, dynamic>> sampleFoods = [
       {
@@ -130,9 +133,25 @@ class _CameraScreenState extends State<CameraScreen> {
 
     // Randomly select a food
     Random random = Random();
-    setState(() {
-      _nutritionData = sampleFoods[random.nextInt(sampleFoods.length)];
-    });
+    var selected = sampleFoods[random.nextInt(sampleFoods.length)];
+
+    // Check if this food is already in favorites
+    try {
+      DatabaseHelper db = DatabaseHelper();
+      bool fav = await db.isFavorite(widget.userId, selected['name']);
+      if (!mounted) return;
+      setState(() {
+        _nutritionData = selected;
+        _isSavedAsFavorite = fav;
+      });
+    } catch (e) {
+      debugPrint('Error checking favorite: $e');
+      if (!mounted) return;
+      setState(() {
+        _nutritionData = selected;
+        _isSavedAsFavorite = false;
+      });
+    }
   }
 
   Future<void> _saveToHistory() async {
@@ -162,7 +181,48 @@ class _CameraScreenState extends State<CameraScreen> {
 
       Navigator.pop(context);
     } catch (e) {
-      print('Error saving to history: $e');
+      debugPrint('Error saving to history: $e');
+    }
+  }
+
+  Future<void> _saveAsFavorite() async {
+    if (_nutritionData == null) return;
+
+    try {
+      DatabaseHelper db = DatabaseHelper();
+      await db.addFavorite({
+        'userId': widget.userId,
+        'foodName': _nutritionData!['name'],
+        'calories': _nutritionData!['calories'],
+        'protein': _nutritionData!['protein'],
+        'fat': _nutritionData!['fat'],
+        'carbs': _nutritionData!['carbs'],
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _isSavedAsFavorite = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Berhasil disimpan ke favorit! ★'),
+          backgroundColor: const Color(0xFFFBBF24),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error saving to favorites: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Gagal menyimpan ke favorit'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
 
@@ -190,7 +250,7 @@ class _CameraScreenState extends State<CameraScreen> {
           Icon(
             Icons.camera_alt_outlined,
             size: 100,
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 24),
           Text(
@@ -211,7 +271,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 color: const Color(0xFF6EE7B7),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6EE7B7).withOpacity(0.5),
+                    color: const Color(0xFF6EE7B7).withValues(alpha: 0.5),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -295,7 +355,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6EE7B7).withOpacity(0.2),
+                      color: const Color(0xFF6EE7B7).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -374,45 +434,76 @@ class _CameraScreenState extends State<CameraScreen> {
                   const SizedBox(height: 24),
 
                   // Action Buttons
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _imageFile = null;
-                              _nutritionData = null;
-                            });
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Color(0xFF6EE7B7)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _imageFile = null;
+                                  _nutritionData = null;
+                                  _isSavedAsFavorite = false;
+                                });
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: const BorderSide(color: Color(0xFF6EE7B7)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Scan Ulang',
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFF6EE7B7),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                          child: Text(
-                            'Scan Ulang',
-                            style: GoogleFonts.poppins(
-                              color: const Color(0xFF6EE7B7),
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _saveToHistory,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                backgroundColor: const Color(0xFF6EE7B7),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Simpan',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _saveToHistory,
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSavedAsFavorite ? null : _saveAsFavorite,
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: const Color(0xFF6EE7B7),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            backgroundColor: _isSavedAsFavorite ? Colors.grey : const Color(0xFFFBBF24),
+                            disabledBackgroundColor: Colors.grey[300],
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: Text(
-                            'Simpan',
+                          icon: Icon(
+                            _isSavedAsFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: _isSavedAsFavorite ? Colors.white : Colors.white,
+                          ),
+                          label: Text(
+                            _isSavedAsFavorite ? 'Sudah di Favorit ✓' : 'Simpan sebagai Favorit',
                             style: GoogleFonts.poppins(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

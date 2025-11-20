@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import '../database/database_helper.dart';
 import '../services/weather_service.dart';
-import '../services/nutrition_service.dart';
+// nutrition_service removed from imports — not used in Dashboard
 import 'profile_screen.dart';
 import 'camera_screen.dart';
 import 'history_screen.dart';
@@ -22,24 +22,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? userData;
   double todayCalories = 0;
   double targetCalories = 2000;
+  double targetProtein = 100.0;
+  double targetFat = 70.0;
+  double targetCarbs = 250.0;
   List<Map<String, dynamic>> recentFoods = [];
+  double todayProtein = 0;
+  double todayFat = 0;
+  double todayCarbs = 0;
   WeatherModel? weather;
   bool isLoading = true;
-
-  late List<Widget> _screens;
+  List<Map<String, dynamic>> favoriteFoods = [];
+  double todayCaloriesBurned = 0;
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      _buildHomeScreen(),
-      ExerciseScreen(
-        userId: widget.userId,
-        userWeight: userData?['weight'],
-      ),
-      HistoryScreen(userId: widget.userId),
-      ProfileScreen(userId: widget.userId),
-    ];
     _loadDashboardData();
   }
 
@@ -48,16 +45,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       DatabaseHelper db = DatabaseHelper();
-      
+
       userData = await db.getUserById(widget.userId);
       todayCalories = await db.getTodayCalories(widget.userId);
-      
+      todayCaloriesBurned = await db.getTodayCaloriesBurned(widget.userId);
+
       if (userData != null) {
         targetCalories = userData!['targetCalories'] ?? 2000.0;
+        targetProtein = userData!['targetProtein'] ?? 100.0;
+        targetFat = userData!['targetFat'] ?? 70.0;
+        targetCarbs = userData!['targetCarbs'] ?? 250.0;
       }
-      
+
       List<Map<String, dynamic>> allFoods = await db.getFoodHistory(widget.userId);
       recentFoods = allFoods.take(5).toList();
+
+      // Calculate macros for today
+      DateTime now = DateTime.now();
+      DateTime startOfDay = DateTime(now.year, now.month, now.day);
+      List<Map<String, dynamic>> todays = allFoods.where((f) {
+        try {
+          DateTime d = DateTime.parse(f['scannedAt']);
+          return d.isAfter(startOfDay.subtract(const Duration(seconds: 1)));
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      todayProtein = 0;
+      todayFat = 0;
+      todayCarbs = 0;
+      for (var f in todays) {
+        todayProtein += (f['protein'] ?? 0).toDouble();
+        todayFat += (f['fat'] ?? 0).toDouble();
+        todayCarbs += (f['carbs'] ?? 0).toDouble();
+      }
+
+      favoriteFoods = await db.getFavorites(widget.userId);
 
       WeatherService weatherService = WeatherService();
       Map<String, dynamic>? weatherData = await weatherService.getCurrentWeather('Jakarta');
@@ -66,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
     } catch (e) {
-      print('Error loading dashboard: $e');
+      debugPrint('Error loading dashboard: $e');
     } finally {
       setState(() => isLoading = false);
     }
@@ -76,13 +100,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: _currentIndex == 0
-          ? (isLoading ? const Center(child: CircularProgressIndicator()) : _buildHomeScreen())
-          : _screens[_currentIndex],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : (_currentIndex == 0 ? _buildHomeScreen() : _getScreen(_currentIndex)),
       bottomNavigationBar: _buildBottomNavBar(),
       floatingActionButton: _currentIndex == 0 ? _buildScanButton() : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
+  }
+
+  Widget _getScreen(int index) {
+    switch (index) {
+      case 1:
+        return ExerciseScreen(userId: widget.userId);
+      case 2:
+        return HistoryScreen(userId: widget.userId);
+      case 3:
+        return ProfileScreen(userId: widget.userId);
+      default:
+        return _buildHomeScreen();
+    }
   }
 
   Widget _buildBottomNavBar() {
@@ -193,6 +230,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 24),
                 _buildCalorieProgress(),
                 const SizedBox(height: 24),
+                _buildMacroSummary(),
+                const SizedBox(height: 16),
+                _buildFavoritesQuickAdd(),
+                const SizedBox(height: 24),
                 _buildRecentFoods(),
                 const SizedBox(height: 80), // Space for FAB
               ],
@@ -200,6 +241,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMacroSummary() {
+    double totalMacro = todayProtein + todayFat + todayCarbs;
+    double pPct = totalMacro > 0 ? (todayProtein / totalMacro) : 0;
+    double fPct = totalMacro > 0 ? (todayFat / totalMacro) : 0;
+    double cPct = totalMacro > 0 ? (todayCarbs / totalMacro) : 0;
+
+    Widget macroCardContainer(String label, double grams, double pct, Color color, {EdgeInsets? margin}) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        margin: margin,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                CircularPercentIndicator(
+                  radius: 28,
+                  lineWidth: 6,
+                  percent: pct.clamp(0, 1),
+                  center: Text('${(pct * 100).toInt()}%', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold)),
+                  progressColor: color,
+                  backgroundColor: Colors.grey[200]!,
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${grams.toStringAsFixed(0)} g', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('grams', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
+                    ],
+                  ),
+                )
+              ],
+            )
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double maxW = constraints.maxWidth;
+        double spacing = 8.0;
+        double cardWidth = (maxW - spacing * 2) / 3;
+
+        return Row(
+          children: [
+            SizedBox(width: cardWidth, child: macroCardContainer('Protein', todayProtein, pPct, const Color(0xFF6EE7B7), margin: const EdgeInsets.only(right: 8))),
+            SizedBox(width: cardWidth, child: macroCardContainer('Lemak', todayFat, fPct, const Color(0xFFFBBF24), margin: const EdgeInsets.only(right: 8))),
+            SizedBox(width: cardWidth, child: macroCardContainer('Karbo', todayCarbs, cPct, const Color(0xFF60A5FA))),
+          ],
+        );
+      },
     );
   }
 
@@ -230,9 +342,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-        GestureDetector(
-          onTap: () {
-            setState(() => _currentIndex = 3);
+          GestureDetector(
+            onTap: () {
+              // Navigate to Profile
+              setState(() => _currentIndex = 3);
           },
           child: Container(
             padding: const EdgeInsets.all(3),
@@ -568,6 +681,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
       ],
     );
+  }
+
+  Widget _buildFavoritesQuickAdd() {
+    if (favoriteFoods.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Favorites',
+          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 110,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: favoriteFoods.length,
+            itemBuilder: (context, index) {
+              var f = favoriteFoods[index];
+              return Container(
+                width: 180,
+                margin: EdgeInsets.only(right: index == favoriteFoods.length - 1 ? 0 : 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(f['foodName'] ?? '', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Text('${(f['calories'] ?? 0).toInt()} kcal', style: GoogleFonts.inter(color: Colors.grey[600])),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _addFavoriteToHistory(f),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6EE7B7),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: Text('Add', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () async {
+                            DatabaseHelper db = DatabaseHelper();
+                            await db.deleteFavorite(f['id']);
+                            await _loadDashboardData();
+                          },
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _addFavoriteToHistory(Map<String, dynamic> fav) async {
+    try {
+      DatabaseHelper db = DatabaseHelper();
+      await db.addFoodHistory({
+        'userId': widget.userId,
+        'foodName': fav['foodName'],
+        'calories': fav['calories'],
+        'protein': fav['protein'],
+        'fat': fav['fat'],
+        'carbs': fav['carbs'],
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ditambahkan ke riwayat dari Favorit'),
+          backgroundColor: Color(0xFF6EE7B7),
+        ),
+      );
+      await _loadDashboardData();
+    } catch (e) {
+      debugPrint('Error adding favorite to history: $e');
+    }
   }
 
   Widget _buildFoodCard(Map<String, dynamic> food) {

@@ -20,6 +20,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
   final _targetCaloriesController = TextEditingController();
+  // Macro target percentages (integers 0-100)
+  int _targetProtein = 30;
+  int _targetFat = 25;
+  int _targetCarbs = 45;
   
   Map<String, dynamic>? userData;
   String? profileImagePath;
@@ -44,10 +48,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _weightController.text = userData!['weight']?.toString() ?? '';
         _heightController.text = userData!['height']?.toString() ?? '';
         _targetCaloriesController.text = userData!['targetCalories']?.toString() ?? '2000';
+        _targetProtein = userData!['targetProtein'] is int ? userData!['targetProtein'] as int : (userData!['targetProtein']?.toInt() ?? _targetProtein);
+        _targetFat = userData!['targetFat'] is int ? userData!['targetFat'] as int : (userData!['targetFat']?.toInt() ?? _targetFat);
+        _targetCarbs = userData!['targetCarbs'] is int ? userData!['targetCarbs'] as int : (userData!['targetCarbs']?.toInt() ?? _targetCarbs);
         profileImagePath = userData!['profileImage'];
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      debugPrint('Error loading user data: $e');
     } finally {
       setState(() => isLoading = false);
     }
@@ -127,6 +134,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'weight': double.tryParse(_weightController.text) ?? 0,
         'height': double.tryParse(_heightController.text) ?? 0,
         'targetCalories': double.tryParse(_targetCaloriesController.text) ?? 2000,
+        'targetProtein': _targetProtein,
+        'targetFat': _targetFat,
+        'targetCarbs': _targetCarbs,
       };
 
       if (profileImagePath != null) {
@@ -375,6 +385,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.local_fire_department_outlined,
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 16),
+
+            // Macro Targets
+            Text(
+              'Target Makronutrien (%)',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            _buildMacroSlider('Protein', _targetProtein, const Color(0xFF6EE7B7), (val) {
+              setState(() {
+                _targetProtein = val;
+                int remainder = 100 - (_targetProtein + _targetFat);
+                _targetCarbs = remainder.clamp(0, 100);
+              });
+            }),
+            const SizedBox(height: 8),
+            _buildMacroSlider('Lemak', _targetFat, const Color(0xFFFBBF24), (val) {
+              setState(() {
+                _targetFat = val;
+                int remainder = 100 - (_targetProtein + _targetFat);
+                _targetCarbs = remainder.clamp(0, 100);
+              });
+            }),
+            const SizedBox(height: 8),
+            _buildMacroSlider('Karbo', _targetCarbs, const Color(0xFF60A5FA), (val) {
+              setState(() {
+                _targetCarbs = val;
+                int diff = 100 - (_targetProtein + _targetFat + _targetCarbs);
+                if (diff != 0) {
+                  _targetFat = (_targetFat + diff).clamp(0, 100);
+                }
+              });
+            }),
             const SizedBox(height: 24),
 
             // Update Button
@@ -470,6 +513,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderSide: const BorderSide(color: Color(0xFF6EE7B7), width: 2),
         ),
       ),
+    );
+  }
+
+  Widget _buildMacroSlider(String label, int value, Color color, ValueChanged<int> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[700])),
+            Text('$value%', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        Slider(
+          value: value.toDouble().clamp(0, 100),
+          min: 0,
+          max: 100,
+          activeColor: color,
+          inactiveColor: color.withOpacity(0.2),
+          divisions: 100,
+          label: '$value%',
+          onChanged: (v) => onChanged(v.toInt()),
+        ),
+      ],
     );
   }
 

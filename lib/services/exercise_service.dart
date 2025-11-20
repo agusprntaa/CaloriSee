@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class ExerciseService {
   // API-Ninjas Exercise API
@@ -21,7 +22,7 @@ class ExerciseService {
       }
       return null;
     } catch (e) {
-      print('Error fetching exercises: $e');
+      debugPrint('Error fetching exercises: $e');
       return null;
     }
   }
@@ -41,7 +42,7 @@ class ExerciseService {
       }
       return null;
     } catch (e) {
-      print('Error fetching exercises: $e');
+      debugPrint('Error fetching exercises: $e');
       return null;
     }
   }

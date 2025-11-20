@@ -18,7 +18,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'calorisee.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -81,9 +81,9 @@ class DatabaseHelper {
       'weight': 70.0,
       'height': 175.0,
       'targetCalories': 2000.0,
-      'targetProtein': 30,
-      'targetFat': 25,
-      'targetCarbs': 45,
+      'targetProtein': 30.0,
+      'targetFat': 25.0,
+      'targetCarbs': 45.0,
       'profileImage': null,
       'createdAt': DateTime.now().toIso8601String(),
     });
@@ -181,6 +181,20 @@ class DatabaseHelper {
       try {
         await db.execute("ALTER TABLE users ADD COLUMN targetCarbs REAL DEFAULT 250.0");
       } catch (_) {}
+    }
+    if (oldVersion < 4) {
+      // Add exercises table when upgrading to v4
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS exercises (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          exerciseName TEXT NOT NULL,
+          caloriesBurned REAL NOT NULL,
+          durationMinutes INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          FOREIGN KEY (userId) REFERENCES users (id)
+        )
+      ''');
     }
   }
 
@@ -318,5 +332,46 @@ class DatabaseHelper {
       whereArgs: [userId, foodName],
     );
     return results.isNotEmpty;
+  }
+
+  // ==================== EXERCISE OPERATIONS ====================
+
+  Future<int> addExercise(Map<String, dynamic> exercise) async {
+    Database db = await database;
+    exercise['date'] = DateTime.now().toIso8601String();
+    return await db.insert('exercises', exercise);
+  }
+
+  Future<List<Map<String, dynamic>>> getExercises(int userId) async {
+    Database db = await database;
+    return await db.query(
+      'exercises',
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'date DESC',
+    );
+  }
+
+  Future<double> getTodayCaloriesBurned(int userId) async {
+    Database db = await database;
+    DateTime now = DateTime.now();
+    String today = DateTime(now.year, now.month, now.day).toIso8601String();
+
+    List<Map<String, dynamic>> results = await db.rawQuery('''
+      SELECT SUM(caloriesBurned) as total
+      FROM exercises
+      WHERE userId = ? AND DATE(date) = DATE(?)
+    ''', [userId, today]);
+
+    return results.first['total'] ?? 0.0;
+  }
+
+  Future<int> deleteExercise(int id) async {
+    Database db = await database;
+    return await db.delete(
+      'exercises',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

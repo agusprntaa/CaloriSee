@@ -7,6 +7,7 @@ import '../services/weather_service.dart';
 import 'profile_screen.dart';
 import 'camera_screen.dart';
 import 'history_screen.dart';
+import 'exercise_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int userId;
@@ -30,8 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double todayCarbs = 0;
   WeatherModel? weather;
   bool isLoading = true;
-  late List<Widget> _screens;
   List<Map<String, dynamic>> favoriteFoods = [];
+  double todayCaloriesBurned = 0;
 
   @override
   void initState() {
@@ -47,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       userData = await db.getUserById(widget.userId);
       todayCalories = await db.getTodayCalories(widget.userId);
+      todayCaloriesBurned = await db.getTodayCaloriesBurned(widget.userId);
 
       if (userData != null) {
         targetCalories = userData!['targetCalories'] ?? 2000.0;
@@ -81,13 +83,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       favoriteFoods = await db.getFavorites(widget.userId);
 
-      // Build screens now that userData is available
-      _screens = [
-        _buildHomeScreen(),
-        HistoryScreen(userId: widget.userId),
-        ProfileScreen(userId: widget.userId),
-      ];
-
       WeatherService weatherService = WeatherService();
       Map<String, dynamic>? weatherData = await weatherService.getCurrentWeather('Jakarta');
       if (weatherData != null) {
@@ -107,11 +102,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: const Color(0xFFF9FAFB),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : (_currentIndex == 0 ? _buildHomeScreen() : _screens[_currentIndex]),
+          : (_currentIndex == 0 ? _buildHomeScreen() : _getScreen(_currentIndex)),
       bottomNavigationBar: _buildBottomNavBar(),
       floatingActionButton: _currentIndex == 0 ? _buildScanButton() : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
+  }
+
+  Widget _getScreen(int index) {
+    switch (index) {
+      case 1:
+        return ExerciseScreen(userId: widget.userId);
+      case 2:
+        return HistoryScreen(userId: widget.userId);
+      case 3:
+        return ProfileScreen(userId: widget.userId);
+      default:
+        return _buildHomeScreen();
+    }
   }
 
   Widget _buildBottomNavBar() {
@@ -135,9 +143,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home_rounded, 'Home', 0),
+              _buildNavItem(Icons.fitness_center_rounded, 'Exercise', 1),
               const SizedBox(width: 60), // Space for FAB
-              _buildNavItem(Icons.history_rounded, 'History', 1),
-              _buildNavItem(Icons.person_rounded, 'Profile', 2),
+              _buildNavItem(Icons.history_rounded, 'History', 2),
+              _buildNavItem(Icons.person_rounded, 'Profile', 3),
             ],
           ),
         ),
@@ -335,8 +344,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
           GestureDetector(
             onTap: () {
-              // Navigate to Profile (index updated after removing Exercise)
-              setState(() => _currentIndex = 2);
+              // Navigate to Profile
+              setState(() => _currentIndex = 3);
           },
           child: Container(
             padding: const EdgeInsets.all(3),

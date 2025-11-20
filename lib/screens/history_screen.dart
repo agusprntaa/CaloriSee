@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
 import '../models/food_model.dart';
 
@@ -37,7 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading history: $e');
+      debugPrint('Error loading history: $e');
       setState(() => isLoading = false);
     }
   }

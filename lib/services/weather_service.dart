@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class WeatherService {
   // Menggunakan OpenWeatherMap API (Free)
@@ -16,11 +17,11 @@ class WeatherService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        print('Error: ${response.statusCode}');
+        debugPrint('Error: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching weather: $e');
+      debugPrint('Error fetching weather: $e');
       return null;
     }
   }
@@ -39,7 +40,7 @@ class WeatherService {
         return null;
       }
     } catch (e) {
-      print('Error fetching weather: $e');
+      debugPrint('Error fetching weather: $e');
       return null;
     }
   }
